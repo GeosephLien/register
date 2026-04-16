@@ -74,15 +74,154 @@
     return response.text();
   }
 
-  async function buildTenantDemoArchive(values) {
-    if (!window.JSZip) {
-      throw new Error('JSZip is not loaded.');
+  function triggerBlobDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  const CRC32_TABLE = (() => {
+    const table = new Uint32Array(256);
+
+    for (let index = 0; index < 256; index += 1) {
+      let value = index;
+      for (let bit = 0; bit < 8; bit += 1) {
+        value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
+      }
+      table[index] = value >>> 0;
     }
 
+    return table;
+  })();
+
+  function computeCrc32(bytes) {
+    let crc = 0xffffffff;
+
+    for (let index = 0; index < bytes.length; index += 1) {
+      crc = CRC32_TABLE[(crc ^ bytes[index]) & 0xff] ^ (crc >>> 8);
+    }
+
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  function createDosDateTime(date = new Date()) {
+    const year = Math.max(1980, date.getFullYear());
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const seconds = Math.floor(date.getSeconds() / 2);
+
+    return {
+      time: ((hours & 0x1f) << 11) | ((minutes & 0x3f) << 5) | (seconds & 0x1f),
+      date: (((year - 1980) & 0x7f) << 9) | ((month & 0x0f) << 5) | (day & 0x1f)
+    };
+  }
+
+  async function toUint8Array(value) {
+    if (value instanceof Uint8Array) {
+      return value;
+    }
+
+    if (value instanceof Blob) {
+      return new Uint8Array(await value.arrayBuffer());
+    }
+
+    if (typeof value === 'string') {
+      return new TextEncoder().encode(value);
+    }
+
+    throw new Error('Unsupported zip content type.');
+  }
+
+  function writeUint16(view, offset, value) {
+    view.setUint16(offset, value & 0xffff, true);
+  }
+
+  function writeUint32(view, offset, value) {
+    view.setUint32(offset, value >>> 0, true);
+  }
+
+  async function buildZipBlob(entries) {
+    const normalizedEntries = await Promise.all(entries.map(async (entry) => {
+      const nameBytes = new TextEncoder().encode(entry.path);
+      const dataBytes = await toUint8Array(entry.content);
+      return {
+        nameBytes,
+        dataBytes,
+        crc32: computeCrc32(dataBytes)
+      };
+    }));
+
+    const parts = [];
+    const centralDirectoryParts = [];
+    let localOffset = 0;
+    const { time, date } = createDosDateTime();
+
+    normalizedEntries.forEach((entry) => {
+      const localHeader = new ArrayBuffer(30);
+      const localView = new DataView(localHeader);
+      writeUint32(localView, 0, 0x04034b50);
+      writeUint16(localView, 4, 20);
+      writeUint16(localView, 6, 0);
+      writeUint16(localView, 8, 0);
+      writeUint16(localView, 10, time);
+      writeUint16(localView, 12, date);
+      writeUint32(localView, 14, entry.crc32);
+      writeUint32(localView, 18, entry.dataBytes.length);
+      writeUint32(localView, 22, entry.dataBytes.length);
+      writeUint16(localView, 26, entry.nameBytes.length);
+      writeUint16(localView, 28, 0);
+      parts.push(localHeader, entry.nameBytes, entry.dataBytes);
+
+      const centralHeader = new ArrayBuffer(46);
+      const centralView = new DataView(centralHeader);
+      writeUint32(centralView, 0, 0x02014b50);
+      writeUint16(centralView, 4, 20);
+      writeUint16(centralView, 6, 20);
+      writeUint16(centralView, 8, 0);
+      writeUint16(centralView, 10, 0);
+      writeUint16(centralView, 12, time);
+      writeUint16(centralView, 14, date);
+      writeUint32(centralView, 16, entry.crc32);
+      writeUint32(centralView, 20, entry.dataBytes.length);
+      writeUint32(centralView, 24, entry.dataBytes.length);
+      writeUint16(centralView, 28, entry.nameBytes.length);
+      writeUint16(centralView, 30, 0);
+      writeUint16(centralView, 32, 0);
+      writeUint16(centralView, 34, 0);
+      writeUint16(centralView, 36, 0);
+      writeUint32(centralView, 38, 0);
+      writeUint32(centralView, 42, localOffset);
+      centralDirectoryParts.push(centralHeader, entry.nameBytes);
+
+      localOffset += 30 + entry.nameBytes.length + entry.dataBytes.length;
+    });
+
+    const centralDirectorySize = centralDirectoryParts.reduce((total, part) => total + part.byteLength, 0);
+    const endRecord = new ArrayBuffer(22);
+    const endView = new DataView(endRecord);
+    writeUint32(endView, 0, 0x06054b50);
+    writeUint16(endView, 4, 0);
+    writeUint16(endView, 6, 0);
+    writeUint16(endView, 8, normalizedEntries.length);
+    writeUint16(endView, 10, normalizedEntries.length);
+    writeUint32(endView, 12, centralDirectorySize);
+    writeUint32(endView, 16, localOffset);
+    writeUint16(endView, 20, 0);
+
+    return new Blob([...parts, ...centralDirectoryParts, endRecord], {
+      type: 'application/zip'
+    });
+  }
+
+  async function buildTenantDemoArchive(values) {
     const tenantFolderName = sanitizeArchiveName(values.tenantId, 'ac2-demo');
-    const zip = new window.JSZip();
-    const rootFolder = zip.folder(tenantFolderName);
-    const vrmaFolder = rootFolder.folder('vrmas');
     const frameSource = getFrameSource(values.hostOrigin);
 
     const [demoHtml, idleVrma, walkVrma] = await Promise.all([
@@ -102,25 +241,25 @@
       `This page owns the AC2 session, opens AC2 on demand, and swaps the host scene avatar when AC2 selects a different VRM. Host origin: ${escapeForHtmlText(values.hostOrigin)}.`
     );
 
-    rootFolder.file('index.html', customizedHtml);
-    vrmaFolder.file('ani_Idle_Stand_Female.vrma', idleVrma);
-    vrmaFolder.file('Walk.vrma', walkVrma);
+    const blob = await buildZipBlob([
+      {
+        path: `${tenantFolderName}/index.html`,
+        content: customizedHtml
+      },
+      {
+        path: `${tenantFolderName}/vrmas/ani_Idle_Stand_Female.vrma`,
+        content: idleVrma
+      },
+      {
+        path: `${tenantFolderName}/vrmas/Walk.vrma`,
+        content: walkVrma
+      }
+    ]);
 
     return {
       archiveName: tenantFolderName,
-      blob: await zip.generateAsync({ type: 'blob' })
+      blob
     };
-  }
-
-  function triggerBlobDownload(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function getFormData() {
