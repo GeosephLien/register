@@ -20,7 +20,7 @@
       <section class="panel form-panel">
         <div class="panel-header">
           <h2>Integration Form</h2>
-          <p>Clients only need to provide their own origin and identity fields.</p>
+          <p>Clients only need to provide their host origin and tenant scope.</p>
         </div>
 
         <form id="generator-form" class="generator-form">
@@ -37,26 +37,10 @@
             <legend>Session Context</legend>
             <label>
               <span>tenantId</span>
-              <input name="tenantId" type="text" value="demo">
+              <input name="tenantId" type="text" value="viverse">
               <span class="field-error" data-field-error="tenantId"></span>
             </label>
-            <label>
-              <span>clientId</span>
-              <input name="clientId" type="text" value="demo">
-              <span class="field-error" data-field-error="clientId"></span>
-            </label>
-            <label>
-              <span>userId</span>
-              <input name="userId" type="text" value="demo-user-001">
-              <span class="field-error" data-field-error="userId"></span>
-            </label>
-            <label>
-              <span>source</span>
-              <input name="source" type="text" value="demo">
-              <span class="field-error" data-field-error="source"></span>
-            </label>
           </fieldset>
-
         </form>
       </section>
 

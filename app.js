@@ -29,6 +29,15 @@
 
   const editableFieldNames = ['hostOrigin', 'tenantId'];
 
+  function getFrameSource(hostOrigin) {
+    try {
+      const host = new URL(hostOrigin).hostname || 'partner-host';
+      return host.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'partner-host';
+    } catch {
+      return 'partner-host';
+    }
+  }
+
   function getFormData() {
     const data = new FormData(form);
     const values = Object.fromEntries(data.entries());
@@ -118,11 +127,32 @@ const CLIENT_CONTEXT = {
 };
 
 const FRAME_STYLE = {
-  source: '${values.appName.toLowerCase().replace(/\s+/g, '-')}',
+  source: '${getFrameSource(values.hostOrigin)}',
   placement: '${values.placement}',
+  breakpoint: 960,
   panelWidth: ${values.panelWidth},
   panelHeight: ${values.panelHeight},
-  panelRadius: ${values.panelRadius}
+  panelRadius: ${values.panelRadius},
+  mobilePanelWidth: null,
+  mobilePanelHeight: ${values.panelHeight},
+  mobilePanelRadius: 22,
+  padding: {
+    top: 32,
+    right: 32,
+    bottom: 32,
+    left: 32
+  },
+  mobilePadding: {
+    top: 16,
+    right: 0,
+    bottom: 16,
+    left: 0
+  },
+  backdrop: 'rgba(4, 7, 20, 0.58)',
+  backdropFilter: 'blur(12px)',
+  panelBackground: 'rgba(11, 14, 40, 0.96)',
+  frameBackground: '#050814',
+  border: '1px solid rgba(255, 255, 255, 0.18)'
 };
 
 let ac2Session = null;
@@ -339,14 +369,19 @@ function isTrustedAc2Event(event) {
 - Verify bearer session token signature and expiration on every protected endpoint.
 - Validate object key ownership against tenant scope before file operations.
 - Keep signed download URLs short-lived.
-- Never trust tenantId passed from browser directly.
+- Allowlist the host origin in Worker CORS before frontend testing.
+- Map browser tenant input to a server-side tenant policy before production use.
 
 ## 4) System-fixed Endpoints
 - AC2 URL: ${SYSTEM_DEFAULTS.ac2Url}
 - AC2 Origin: ${SYSTEM_DEFAULTS.ac2Origin}
 - API Base: ${SYSTEM_DEFAULTS.apiBase}
 
-## 5) Validation Report
+## 5) Current API Notes
+- Session API currently accepts: { tenantId }
+- Protected endpoints used by the host sample: /session, /files, /download-url, /active-avatar
+
+## 6) Validation Report
 ${issueSummary}
 `;
   }
