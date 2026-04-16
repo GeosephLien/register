@@ -16,6 +16,7 @@
   const frontendOutput = document.getElementById('frontend-output');
   const apiOutput = document.getElementById('api-output');
   const securityOutput = document.getElementById('security-output');
+  const downloadButton = document.getElementById('download-demo-button');
   const copyButtons = Array.from(document.querySelectorAll('[data-copy-target]'));
   const tabButtons = Array.from(document.querySelectorAll('[data-tab-target]'));
   const tabPanels = Array.from(document.querySelectorAll('[data-tab-panel]'));
@@ -36,6 +37,90 @@
     } catch {
       return 'partner-host';
     }
+  }
+
+  function sanitizeArchiveName(value, fallback = 'ac2-demo') {
+    const sanitized = String(value || '')
+      .trim()
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    return sanitized || fallback;
+  }
+
+  function escapeForSingleQuotedJs(value) {
+    return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  }
+
+  function escapeForHtmlText(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  async function fetchAsset(path, responseType = 'text') {
+    const response = await fetch(path, { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error('Failed to fetch ' + path + ' (' + response.status + ')');
+    }
+
+    if (responseType === 'blob') {
+      return response.blob();
+    }
+
+    return response.text();
+  }
+
+  async function buildTenantDemoArchive(values) {
+    if (!window.JSZip) {
+      throw new Error('JSZip is not loaded.');
+    }
+
+    const tenantFolderName = sanitizeArchiveName(values.tenantId, 'ac2-demo');
+    const zip = new window.JSZip();
+    const rootFolder = zip.folder(tenantFolderName);
+    const vrmaFolder = rootFolder.folder('vrmas');
+    const frameSource = getFrameSource(values.hostOrigin);
+
+    const [demoHtml, idleVrma, walkVrma] = await Promise.all([
+      fetchAsset('../demo/index.html', 'text'),
+      fetchAsset('../demo/vrmas/ani_Idle_Stand_Female.vrma', 'blob'),
+      fetchAsset('../demo/vrmas/Walk.vrma', 'blob')
+    ]);
+
+    let customizedHtml = demoHtml;
+    customizedHtml = customizedHtml.replace('<title>Partner VRM Host</title>', `<title>${escapeForHtmlText(values.tenantId)} VRM Host</title>`);
+    customizedHtml = customizedHtml.replace('const AC2_API_BASE = \'https://ac2-host-api-avatar-page.kuanyi-lien.workers.dev\';', `const AC2_API_BASE = 'https://ac2-host-api-avatar-page.kuanyi-lien.workers.dev';\n    const HOST_ORIGIN = '${escapeForSingleQuotedJs(values.hostOrigin)}';`);
+    customizedHtml = customizedHtml.replace('const AC2_TENANT_ID = \'viverse\';', `const AC2_TENANT_ID = '${escapeForSingleQuotedJs(values.tenantId)}';`);
+    customizedHtml = customizedHtml.replace("source: 'partner-host',", `source: '${escapeForSingleQuotedJs(frameSource)}',`);
+    customizedHtml = customizedHtml.replace('<h1 class="overlay-title">Partner VRM Host</h1>', `<h1 class="overlay-title">${escapeForHtmlText(values.tenantId)} VRM Host</h1>`);
+    customizedHtml = customizedHtml.replace(
+      'This page owns the AC2 session, opens AC2 on demand, and swaps the host scene avatar when AC2 selects a different VRM.',
+      `This page owns the AC2 session, opens AC2 on demand, and swaps the host scene avatar when AC2 selects a different VRM. Host origin: ${escapeForHtmlText(values.hostOrigin)}.`
+    );
+
+    rootFolder.file('index.html', customizedHtml);
+    vrmaFolder.file('ani_Idle_Stand_Female.vrma', idleVrma);
+    vrmaFolder.file('Walk.vrma', walkVrma);
+
+    return {
+      archiveName: tenantFolderName,
+      blob: await zip.generateAsync({ type: 'blob' })
+    };
+  }
+
+  function triggerBlobDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function getFormData() {
@@ -396,6 +481,38 @@ ${issueSummary}
     securityOutput.textContent = renderSecuritySnippet(values, validation.issues);
   }
 
+  async function handleDownloadDemo() {
+    const values = getFormData();
+    const validation = validate(values);
+
+    renderFieldErrors(validation.fieldErrors);
+    if (validation.issues.length) {
+      return;
+    }
+
+    if (!downloadButton) {
+      return;
+    }
+
+    const originalText = downloadButton.textContent;
+    downloadButton.disabled = true;
+    downloadButton.textContent = 'Preparing';
+
+    try {
+      const archive = await buildTenantDemoArchive(values);
+      triggerBlobDownload(archive.blob, archive.archiveName + '.zip');
+      downloadButton.textContent = 'Downloaded';
+    } catch (error) {
+      console.error(error);
+      downloadButton.textContent = 'Failed';
+    } finally {
+      window.setTimeout(() => {
+        downloadButton.disabled = false;
+        downloadButton.textContent = originalText;
+      }, 1400);
+    }
+  }
+
   copyButtons.forEach((button) => {
     button.addEventListener('click', async () => {
       const targetId = button.getAttribute('data-copy-target');
@@ -438,6 +555,12 @@ ${issueSummary}
 
   form.addEventListener('input', render);
   form.addEventListener('change', render);
+
+  if (downloadButton) {
+    downloadButton.addEventListener('click', () => {
+      handleDownloadDemo();
+    });
+  }
 
   render();
 })();

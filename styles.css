@@ -99,6 +99,11 @@ body {
   gap: 16px;
 }
 
+.form-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 fieldset {
   margin: 0;
   padding: 18px;
