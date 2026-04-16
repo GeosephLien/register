@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AC2 Register Builder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <main class="workspace">
+      <section class="panel form-panel">
+        <div class="panel-header">
+          <h2>Integration Form</h2>
+          <p>Clients only need to provide their own origin and identity fields.</p>
+        </div>
+
+        <form id="generator-form" class="generator-form">
+          <fieldset>
+            <legend>Client Settings</legend>
+            <label>
+              <span>Host Origin</span>
+              <input name="hostOrigin" type="url" value="https://partner.example.com" placeholder="https://partner.example.com">
+              <span class="field-error" data-field-error="hostOrigin"></span>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Session Context</legend>
+            <label>
+              <span>tenantId</span>
+              <input name="tenantId" type="text" value="demo">
+              <span class="field-error" data-field-error="tenantId"></span>
+            </label>
+            <label>
+              <span>clientId</span>
+              <input name="clientId" type="text" value="demo">
+              <span class="field-error" data-field-error="clientId"></span>
+            </label>
+            <label>
+              <span>userId</span>
+              <input name="userId" type="text" value="demo-user-001">
+              <span class="field-error" data-field-error="userId"></span>
+            </label>
+            <label>
+              <span>source</span>
+              <input name="source" type="text" value="demo">
+              <span class="field-error" data-field-error="source"></span>
+            </label>
+          </fieldset>
+
+        </form>
+      </section>
+
+      <section class="panel output-panel">
+        <div class="panel-header output-header">
+          <div>
+            <h2>Generated Files</h2>
+            <p>Generated as three recommended files: frontend integration, API helper, and backend security config.</p>
+          </div>
+          <div class="tab-list" role="tablist" aria-label="Generated files tabs">
+            <button class="tab-button is-active" type="button" data-tab-target="frontend">Frontend</button>
+            <button class="tab-button" type="button" data-tab-target="api">API</button>
+            <button class="tab-button" type="button" data-tab-target="security">Security</button>
+          </div>
+        </div>
+
+        <div class="snippet-panels">
+          <article class="snippet-card is-active" data-tab-panel="frontend">
+            <div class="snippet-meta">
+              <div>
+                <h3>Frontend Integration</h3>
+                <p>Use in the host frontend page, including embed and postMessage flow.</p>
+              </div>
+              <button class="copy-button" type="button" data-copy-target="frontend-output">Copy</button>
+            </div>
+            <pre><code id="frontend-output"></code></pre>
+          </article>
+
+          <article class="snippet-card" data-tab-panel="api">
+            <div class="snippet-meta">
+              <div>
+                <h3>API Helper</h3>
+                <p>Standalone API client module imported by the frontend integration file.</p>
+              </div>
+              <button class="copy-button" type="button" data-copy-target="api-output">Copy</button>
+            </div>
+            <pre><code id="api-output"></code></pre>
+          </article>
+
+          <article class="snippet-card" data-tab-panel="security">
+            <div class="snippet-meta">
+              <div>
+                <h3>Backend Security Config</h3>
+                <p>Backend CORS allowlist and message origin verification examples.</p>
+              </div>
+              <button class="copy-button" type="button" data-copy-target="security-output">Copy</button>
+            </div>
+            <pre><code id="security-output"></code></pre>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
