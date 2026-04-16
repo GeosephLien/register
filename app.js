@@ -27,7 +27,7 @@
     ])
   );
 
-  const editableFieldNames = ['hostOrigin', 'tenantId', 'clientId', 'userId', 'source'];
+  const editableFieldNames = ['hostOrigin', 'tenantId'];
 
   function getFormData() {
     const data = new FormData(form);
@@ -37,9 +37,6 @@
       appName: SYSTEM_DEFAULTS.appName,
       hostOrigin: String(values.hostOrigin || '').trim(),
       tenantId: String(values.tenantId || '').trim(),
-      clientId: String(values.clientId || '').trim(),
-      userId: String(values.userId || '').trim(),
-      source: String(values.source || '').trim(),
       locale: SYSTEM_DEFAULTS.locale,
       uiMode: SYSTEM_DEFAULTS.uiMode,
       placement: SYSTEM_DEFAULTS.placement,
@@ -64,7 +61,7 @@
       }
     }
 
-    ['tenantId', 'clientId', 'userId', 'source'].forEach((key) => {
+    ['tenantId'].forEach((key) => {
       if (!values[key]) {
         fieldErrors[key] = key + ' is required.';
       }
@@ -115,10 +112,7 @@ const AC2_URL = '${SYSTEM_DEFAULTS.ac2Url}';
 const AC2_API_BASE = '${SYSTEM_DEFAULTS.apiBase}';
 
 const CLIENT_CONTEXT = {
-  source: '${values.source}',
-  clientId: '${values.clientId}',
   tenantId: '${values.tenantId}',
-  userId: '${values.userId}',
   locale: '${values.locale}',
   uiMode: '${values.uiMode}'
 };
@@ -196,7 +190,7 @@ export async function syncInitialAvatar() {
     throw new Error('AC2 session is not ready. Call openAc2() first.');
   }
 
-  const filesResult = await fetchVrmFiles(AC2_API_BASE, ac2Session.sessionToken, CLIENT_CONTEXT.userId, ${credentials});
+  const filesResult = await fetchVrmFiles(AC2_API_BASE, ac2Session.sessionToken, ${credentials});
   const files = Array.isArray(filesResult.files) ? filesResult.files : [];
 
   if (!files.length) {
@@ -241,10 +235,7 @@ export async function requestAc2Session(apiBase, context, credentials = ${creden
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      source: context.source,
-      clientId: context.clientId,
-      tenantId: context.tenantId,
-      userId: context.userId
+      tenantId: context.tenantId
     })
   });
 
@@ -255,8 +246,8 @@ export async function requestAc2Session(apiBase, context, credentials = ${creden
   return response.json();
 }
 
-export async function fetchVrmFiles(apiBase, sessionToken, userId = '${values.userId}', credentials = ${credentials}) {
-  const response = await fetch(apiBase + '/api/ac2/files?userId=' + encodeURIComponent(userId), {
+export async function fetchVrmFiles(apiBase, sessionToken, credentials = ${credentials}) {
+  const response = await fetch(apiBase + '/api/ac2/files', {
     method: 'GET',
     credentials,
     headers: buildAuthHeaders(sessionToken)
@@ -346,9 +337,9 @@ function isTrustedAc2Event(event) {
 
 ## 3) Required Backend Controls
 - Verify bearer session token signature and expiration on every protected endpoint.
-- Validate object key ownership against tenantId/userId before file operations.
+- Validate object key ownership against tenant scope before file operations.
 - Keep signed download URLs short-lived.
-- Never trust tenantId/clientId/userId passed from browser directly.
+- Never trust tenantId passed from browser directly.
 
 ## 4) System-fixed Endpoints
 - AC2 URL: ${SYSTEM_DEFAULTS.ac2Url}
