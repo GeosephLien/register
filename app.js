@@ -237,7 +237,8 @@
 
     let customizedHtml = demoHtml;
     customizedHtml = customizedHtml.replace('<title>Partner VRM Host</title>', `<title>${escapeForHtmlText(values.tenantId)} VRM Host</title>`);
-    customizedHtml = customizedHtml.replace('const AC2_API_BASE = \'https://ac2-host-api-avatar-page.kuanyi-lien.workers.dev\';', `const AC2_API_BASE = 'https://ac2-host-api-avatar-page.kuanyi-lien.workers.dev';\n    const HOST_ORIGIN = '${escapeForSingleQuotedJs(values.hostOrigin)}';`);
+    customizedHtml = customizedHtml.replace('const AC2_API_BASE = \'https://ac2-host-api-avatar-page.kuanyi-lien.workers.dev\';', `const AC2_API_BASE = 'https://ac2-host-api-avatar-page.kuanyi-lien.workers.dev';`);
+    customizedHtml = customizedHtml.replace('const HOST_ORIGIN = window.location.origin;', `const HOST_ORIGIN = '${escapeForSingleQuotedJs(values.hostOrigin)}';`);
     customizedHtml = customizedHtml.replace('const AC2_TENANT_ID = \'viverse\';', `const AC2_TENANT_ID = '${escapeForSingleQuotedJs(values.tenantId)}';`);
     customizedHtml = customizedHtml.replace("source: 'partner-host',", `source: '${escapeForSingleQuotedJs(frameSource)}',`);
     customizedHtml = customizedHtml.replace('<h1 class="overlay-title">Partner VRM Host</h1>', `<h1 class="overlay-title">${escapeForHtmlText(values.tenantId)} VRM Host</h1>`);
@@ -351,6 +352,7 @@ const AC2_API_BASE = '${SYSTEM_DEFAULTS.apiBase}';
 
 const CLIENT_CONTEXT = {
   tenantId: '${values.tenantId}',
+  domain: '${values.hostOrigin}',
   locale: '${values.locale}',
   uiMode: '${values.uiMode}'
 };
@@ -494,7 +496,8 @@ export async function requestAc2Session(apiBase, context, credentials = ${creden
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      tenantId: context.tenantId
+      tenantId: context.tenantId,
+      domain: context.domain
     })
   });
 
