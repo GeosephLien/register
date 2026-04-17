@@ -231,8 +231,8 @@
 
     const [demoHtml, idleVrma, walkVrma] = await Promise.all([
       fetchAsset('../demo/index.html', 'text'),
-      fetchAsset('../demo/vrmas/ani_Idle_Stand_Female.vrma', 'blob'),
-      fetchAsset('../demo/vrmas/Walk.vrma', 'blob')
+      fetchAsset('../demo/vrmas/idle.vrma', 'blob'),
+      fetchAsset('../demo/vrmas/walk.vrma', 'blob')
     ]);
 
     let customizedHtml = demoHtml;
@@ -253,11 +253,11 @@
         content: customizedHtml
       },
       {
-        path: `${tenantFolderName}/vrmas/ani_Idle_Stand_Female.vrma`,
+        path: `${tenantFolderName}/vrmas/idle.vrma`,
         content: idleVrma
       },
       {
-        path: `${tenantFolderName}/vrmas/Walk.vrma`,
+        path: `${tenantFolderName}/vrmas/walk.vrma`,
         content: walkVrma
       }
     ]);
