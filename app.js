@@ -229,11 +229,7 @@
     const tenantFolderName = getArchiveBaseName(values.tenantId, 'ac2-demo');
     const frameSource = getFrameSource(values.hostOrigin);
 
-    const [demoHtml, idleVrma, walkVrma] = await Promise.all([
-      fetchAsset('../demo/index.html', 'text'),
-      fetchAsset('../demo/vrmas/idle.vrma', 'blob'),
-      fetchAsset('../demo/vrmas/walk.vrma', 'blob')
-    ]);
+    const demoHtml = await fetchAsset('../demo/index.html', 'text');
 
     let customizedHtml = demoHtml;
     customizedHtml = customizedHtml.replace('<title>Partner VRM Host</title>', `<title>${escapeForHtmlText(values.tenantId)} VRM Host</title>`);
@@ -251,14 +247,6 @@
       {
         path: `${tenantFolderName}/index.html`,
         content: customizedHtml
-      },
-      {
-        path: `${tenantFolderName}/vrmas/idle.vrma`,
-        content: idleVrma
-      },
-      {
-        path: `${tenantFolderName}/vrmas/walk.vrma`,
-        content: walkVrma
       }
     ]);
 
