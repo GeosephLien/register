@@ -312,7 +312,7 @@
 
     const blob = await buildZipBlob([
       {
-        path: `${tenantFolderName}/index.html`,
+        path: 'index.html',
         content: customizedHtml
       }
     ]);
