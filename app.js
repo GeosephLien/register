@@ -46,6 +46,15 @@
     return sanitized || fallback;
   }
 
+  function getArchiveBaseName(emailLikeValue, fallback = 'ac2-demo') {
+    const normalizedValue = String(emailLikeValue || '').trim();
+    const localPart = normalizedValue.includes('@')
+      ? normalizedValue.split('@')[0]
+      : normalizedValue;
+
+    return sanitizeArchiveName(localPart, fallback);
+  }
+
   function escapeForSingleQuotedJs(value) {
     return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   }
@@ -217,7 +226,7 @@
   }
 
   async function buildTenantDemoArchive(values) {
-    const tenantFolderName = sanitizeArchiveName(values.tenantId, 'ac2-demo');
+    const tenantFolderName = getArchiveBaseName(values.tenantId, 'ac2-demo');
     const frameSource = getFrameSource(values.hostOrigin);
 
     const [demoHtml, idleVrma, walkVrma] = await Promise.all([
@@ -258,16 +267,17 @@
     };
   }
 
-  function getFormData() {
+  function getFormData(options = {}) {
+    const applyDefaults = options.applyDefaults === true;
     const data = new FormData(form);
     const values = Object.fromEntries(data.entries());
-    const hostOrigin = String(values.hostOrigin || '').trim() || SYSTEM_DEFAULTS.hostOrigin;
-    const tenantId = String(values.tenantId || '').trim() || SYSTEM_DEFAULTS.tenantId;
+    const hostOrigin = String(values.hostOrigin || '').trim();
+    const tenantId = String(values.tenantId || '').trim();
 
     return {
       appName: SYSTEM_DEFAULTS.appName,
-      hostOrigin,
-      tenantId,
+      hostOrigin: hostOrigin || (applyDefaults ? SYSTEM_DEFAULTS.hostOrigin : ''),
+      tenantId: tenantId || (applyDefaults ? SYSTEM_DEFAULTS.tenantId : ''),
       locale: SYSTEM_DEFAULTS.locale,
       uiMode: SYSTEM_DEFAULTS.uiMode,
       placement: SYSTEM_DEFAULTS.placement,
@@ -275,28 +285,25 @@
       panelHeight: SYSTEM_DEFAULTS.panelHeight,
       panelRadius: SYSTEM_DEFAULTS.panelRadius,
       useCredentials: true,
-      allowedOrigins: values.hostOrigin ? [String(values.hostOrigin).trim()] : []
+      allowedOrigins: hostOrigin ? [hostOrigin] : []
     };
   }
 
   function validate(values) {
     const fieldErrors = {};
+    const effectiveHostOrigin = values.hostOrigin || SYSTEM_DEFAULTS.hostOrigin;
 
-    if (!values.hostOrigin) {
-      fieldErrors.hostOrigin = 'Host origin is required.';
-    } else {
-      try {
-        new URL(values.hostOrigin);
-      } catch {
-        fieldErrors.hostOrigin = 'Host origin must be a valid URL.';
-      }
+    try {
+      new URL(effectiveHostOrigin);
+    } catch {
+      fieldErrors.hostOrigin = 'Domain must be a valid URL.';
     }
 
-    ['tenantId'].forEach((key) => {
-      if (!values[key]) {
-        fieldErrors[key] = key + ' is required.';
-      }
-    });
+    if (!values.tenantId) {
+      fieldErrors.tenantId = 'Email is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.tenantId)) {
+      fieldErrors.tenantId = 'Email must be a valid email address.';
+    }
 
     const issues = editableFieldNames
       .filter((name) => Boolean(fieldErrors[name]))
@@ -608,11 +615,8 @@ ${issueSummary}
 `;
   }
 
-  function render() {
-    const values = getFormData();
-    const validation = validate(values);
-
-    renderFieldErrors(validation.fieldErrors);
+  function clearFieldErrors() {
+    renderFieldErrors({});
   }
 
   async function handleDownloadDemo() {
@@ -633,7 +637,7 @@ ${issueSummary}
     downloadButton.textContent = 'Preparing';
 
     try {
-      const archive = await buildTenantDemoArchive(values);
+      const archive = await buildTenantDemoArchive(getFormData({ applyDefaults: true }));
       triggerBlobDownload(archive.blob, archive.archiveName + '.zip');
       downloadButton.textContent = 'Downloaded';
     } catch (error) {
@@ -647,8 +651,8 @@ ${issueSummary}
     }
   }
 
-  form.addEventListener('input', render);
-  form.addEventListener('change', render);
+  form.addEventListener('input', clearFieldErrors);
+  form.addEventListener('change', clearFieldErrors);
 
   if (downloadButton) {
     downloadButton.addEventListener('click', () => {
@@ -656,5 +660,4 @@ ${issueSummary}
     });
   }
 
-  render();
 })();
