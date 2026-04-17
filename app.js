@@ -79,6 +79,26 @@
     return response.text();
   }
 
+  async function registerHostOrigin(values) {
+    const response = await fetch(SYSTEM_DEFAULTS.apiBase + '/api/ac2/register-host', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        tenantId: values.tenantId,
+        hostOrigin: values.hostOrigin
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to register host origin (' + response.status + ')');
+    }
+
+    return response.json();
+  }
+
   function triggerBlobDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -628,7 +648,9 @@ ${issueSummary}
     downloadButton.textContent = 'Preparing';
 
     try {
-      const archive = await buildTenantDemoArchive(getFormData({ applyDefaults: true }));
+      const effectiveValues = getFormData({ applyDefaults: true });
+      await registerHostOrigin(effectiveValues);
+      const archive = await buildTenantDemoArchive(effectiveValues);
       triggerBlobDownload(archive.blob, archive.archiveName + '.zip');
       downloadButton.textContent = 'Downloaded';
     } catch (error) {
