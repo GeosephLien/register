@@ -10,94 +10,37 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <div class="page-shell">
-    <nav class="page-nav" aria-label="Page navigation">
-      <a class="nav-link" href="https://geosephlien.github.io/landing/">Back</a>
-      <a class="nav-link" href="https://geosephlien.github.io/usage/">Usage</a>
-    </nav>
+  <nav class="page-nav" aria-label="Page navigation">
+    <a class="nav-link nav-link-secondary" href="https://geosephlien.github.io/landing/">Back</a>
+  </nav>
 
-    <main class="workspace">
-      <section class="panel form-panel">
-        <div class="panel-header">
-          <h2>Integration Form</h2>
-          <p>Clients only need to provide their host origin and tenant scope.</p>
-        </div>
+  <main class="register-shell">
+    <section class="panel form-panel">
+      <div class="panel-header">
+        <h2>Get Your Sample Project</h2>
+        <p>Provide your email and domain to download.</p>
+      </div>
 
         <form id="generator-form" class="generator-form">
           <fieldset>
-            <legend>Client Settings</legend>
             <label>
-              <span>Host Origin</span>
-              <input name="hostOrigin" type="url" value="https://geosephlien.github.io" placeholder="https://partner.example.com">
+              <span>Email</span>
+              <input name="tenantId" type="text" placeholder="openme@htc.com">
+              <span class="field-error" data-field-error="tenantId"></span>
+            </label>
+            <label>
+              <span>Domain</span>
+              <input name="hostOrigin" type="url" placeholder="http://localhost:5500">
               <span class="field-error" data-field-error="hostOrigin"></span>
             </label>
           </fieldset>
 
-          <fieldset>
-            <legend>Session Context</legend>
-            <label>
-              <span>tenantId</span>
-              <input name="tenantId" type="text" value="viverse">
-              <span class="field-error" data-field-error="tenantId"></span>
-            </label>
-          </fieldset>
-
-          <div class="form-actions">
-            <button id="download-demo-button" class="copy-button" type="button">Download</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="panel output-panel">
-        <div class="panel-header output-header">
-          <div>
-            <h2>Generated Files</h2>
-            <p>Generated as three recommended files: frontend integration, API helper, and backend security config.</p>
-          </div>
-          <div class="tab-list" role="tablist" aria-label="Generated files tabs">
-            <button class="tab-button is-active" type="button" data-tab-target="frontend">Frontend</button>
-            <button class="tab-button" type="button" data-tab-target="api">API</button>
-            <button class="tab-button" type="button" data-tab-target="security">Security</button>
-          </div>
+        <div class="form-actions">
+          <button id="download-demo-button" class="copy-button" type="button">Download</button>
         </div>
-
-        <div class="snippet-panels">
-          <article class="snippet-card is-active" data-tab-panel="frontend">
-            <div class="snippet-meta">
-              <div>
-                <h3>Frontend Integration</h3>
-                <p>Use in the host frontend page, including embed and postMessage flow.</p>
-              </div>
-              <button class="copy-button" type="button" data-copy-target="frontend-output">Copy</button>
-            </div>
-            <pre><code id="frontend-output"></code></pre>
-          </article>
-
-          <article class="snippet-card" data-tab-panel="api">
-            <div class="snippet-meta">
-              <div>
-                <h3>API Helper</h3>
-                <p>Standalone API client module imported by the frontend integration file.</p>
-              </div>
-              <button class="copy-button" type="button" data-copy-target="api-output">Copy</button>
-            </div>
-            <pre><code id="api-output"></code></pre>
-          </article>
-
-          <article class="snippet-card" data-tab-panel="security">
-            <div class="snippet-meta">
-              <div>
-                <h3>Backend Security Config</h3>
-                <p>Backend CORS allowlist and message origin verification examples.</p>
-              </div>
-              <button class="copy-button" type="button" data-copy-target="security-output">Copy</button>
-            </div>
-            <pre><code id="security-output"></code></pre>
-          </article>
-        </div>
-      </section>
-    </main>
-  </div>
+      </form>
+    </section>
+  </main>
 
   <script src="./app.js"></script>
 </body>

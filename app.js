@@ -1,10 +1,12 @@
 (function () {
   const SYSTEM_DEFAULTS = {
     appName: 'Partner Host',
+    tenantId: 'openme@htc.com',
     locale: 'zh-TW',
     ac2Url: 'https://geosephlien.github.io/ac2/?embedded=1&uiMode=modal',
     ac2Origin: 'https://geosephlien.github.io',
     apiBase: 'https://ac2-host-api-avatar-page.kuanyi-lien.workers.dev',
+    hostOrigin: 'http://localhost:5500',
     uiMode: 'modal',
     placement: 'center',
     panelWidth: 1280,
@@ -13,13 +15,7 @@
   };
 
   const form = document.getElementById('generator-form');
-  const frontendOutput = document.getElementById('frontend-output');
-  const apiOutput = document.getElementById('api-output');
-  const securityOutput = document.getElementById('security-output');
   const downloadButton = document.getElementById('download-demo-button');
-  const copyButtons = Array.from(document.querySelectorAll('[data-copy-target]'));
-  const tabButtons = Array.from(document.querySelectorAll('[data-tab-target]'));
-  const tabPanels = Array.from(document.querySelectorAll('[data-tab-panel]'));
 
   const fieldErrorElements = new Map(
     Array.from(document.querySelectorAll('[data-field-error]')).map((element) => [
@@ -265,11 +261,13 @@
   function getFormData() {
     const data = new FormData(form);
     const values = Object.fromEntries(data.entries());
+    const hostOrigin = String(values.hostOrigin || '').trim() || SYSTEM_DEFAULTS.hostOrigin;
+    const tenantId = String(values.tenantId || '').trim() || SYSTEM_DEFAULTS.tenantId;
 
     return {
       appName: SYSTEM_DEFAULTS.appName,
-      hostOrigin: String(values.hostOrigin || '').trim(),
-      tenantId: String(values.tenantId || '').trim(),
+      hostOrigin,
+      tenantId,
       locale: SYSTEM_DEFAULTS.locale,
       uiMode: SYSTEM_DEFAULTS.uiMode,
       placement: SYSTEM_DEFAULTS.placement,
@@ -615,9 +613,6 @@ ${issueSummary}
     const validation = validate(values);
 
     renderFieldErrors(validation.fieldErrors);
-    frontendOutput.textContent = renderFrontendSnippet(values);
-    apiOutput.textContent = renderApiSnippet(values);
-    securityOutput.textContent = renderSecuritySnippet(values, validation.issues);
   }
 
   async function handleDownloadDemo() {
@@ -651,46 +646,6 @@ ${issueSummary}
       }, 1400);
     }
   }
-
-  copyButtons.forEach((button) => {
-    button.addEventListener('click', async () => {
-      const targetId = button.getAttribute('data-copy-target');
-      const target = document.getElementById(targetId);
-      const text = target ? target.textContent : '';
-
-      if (!text) {
-        return;
-      }
-
-      try {
-        await navigator.clipboard.writeText(text);
-        button.textContent = 'Copied';
-        window.setTimeout(() => {
-          button.textContent = 'Copy';
-        }, 1200);
-      } catch (error) {
-        console.error(error);
-        button.textContent = 'Failed';
-        window.setTimeout(() => {
-          button.textContent = 'Copy';
-        }, 1200);
-      }
-    });
-  });
-
-  tabButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const target = button.getAttribute('data-tab-target');
-
-      tabButtons.forEach((entry) => {
-        entry.classList.toggle('is-active', entry === button);
-      });
-
-      tabPanels.forEach((panel) => {
-        panel.classList.toggle('is-active', panel.getAttribute('data-tab-panel') === target);
-      });
-    });
-  });
 
   form.addEventListener('input', render);
   form.addEventListener('change', render);
