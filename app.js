@@ -110,6 +110,50 @@
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  function isFilePickerAbortError(error) {
+    return error && (error.name === 'AbortError' || error.message === 'The user aborted a request.');
+  }
+
+  async function saveBlobWithFilePicker(blob, filename) {
+    if (typeof window.showSaveFilePicker !== 'function') {
+      return false;
+    }
+
+    const extension = filename.includes('.') ? filename.split('.').pop().toLowerCase() : 'zip';
+    const handle = await window.showSaveFilePicker({
+      suggestedName: filename,
+      types: [
+        {
+          description: 'ZIP archive',
+          accept: {
+            'application/zip': ['.' + extension]
+          }
+        }
+      ]
+    });
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return true;
+  }
+
+  async function saveArchiveBlob(blob, filename) {
+    try {
+      const saved = await saveBlobWithFilePicker(blob, filename);
+      if (saved) {
+        return 'saved';
+      }
+    } catch (error) {
+      if (isFilePickerAbortError(error)) {
+        return 'cancelled';
+      }
+      console.warn('File picker save failed, falling back to browser download.', error);
+    }
+
+    triggerBlobDownload(blob, filename);
+    return 'downloaded';
+  }
+
   const CRC32_TABLE = (() => {
     const table = new Uint32Array(256);
 
@@ -654,8 +698,8 @@ ${issueSummary}
       const effectiveValues = getFormData({ applyDefaults: true });
       await registerHostOrigin(effectiveValues);
       const archive = await buildTenantDemoArchive(effectiveValues);
-      triggerBlobDownload(archive.blob, archive.archiveName + '.zip');
-      downloadButton.textContent = 'Downloaded';
+      const saveResult = await saveArchiveBlob(archive.blob, archive.archiveName + '.zip');
+      downloadButton.textContent = saveResult === 'cancelled' ? originalText : 'Downloaded';
     } catch (error) {
       console.error(error);
       downloadButton.textContent = 'Failed';
