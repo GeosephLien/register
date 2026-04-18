@@ -19,6 +19,8 @@
   const verificationModal = document.getElementById('download-verification-modal');
   const verificationCodeInput = document.getElementById('verification-code-input');
   const verificationStatus = document.getElementById('verification-status');
+  const verificationDescription = document.getElementById('verification-panel-description');
+  const verificationResendButton = document.getElementById('verification-resend-button');
   const verificationDownloadButton = document.getElementById('verification-download-button');
   const verificationCloseTargets = Array.from(document.querySelectorAll('[data-close-verification-panel]'));
 
@@ -32,6 +34,8 @@
     isSending: false,
     isDownloading: false
   };
+
+  const DEFAULT_VERIFICATION_DESCRIPTION = 'We sent a verification code to your email. Enter it below to unlock the download.';
 
   const fieldErrorElements = new Map(
     Array.from(document.querySelectorAll('[data-field-error]')).map((element) => [
@@ -830,6 +834,28 @@ ${issueSummary}
     verificationDownloadButton.disabled = !verificationState.isVerified || verificationState.isDownloading;
   }
 
+  function syncVerificationResendButton() {
+    if (!verificationResendButton) {
+      return;
+    }
+
+    verificationResendButton.disabled = verificationState.isSending || verificationState.isDownloading;
+    verificationResendButton.textContent = verificationState.isSending ? 'Sending...' : 'Resend code';
+  }
+
+  function renderVerificationDescription(email) {
+    if (!verificationDescription) {
+      return;
+    }
+
+    if (!email) {
+      verificationDescription.textContent = DEFAULT_VERIFICATION_DESCRIPTION;
+      return;
+    }
+
+    verificationDescription.textContent = `We sent a verification code to ${email}. Enter it below to unlock the download.`;
+  }
+
   function closeVerificationPanel() {
     verificationState.isOpen = false;
     verificationState.isVerified = false;
@@ -851,6 +877,8 @@ ${issueSummary}
 
     setVerificationStatus('');
     syncVerificationDownloadButton();
+    syncVerificationResendButton();
+    renderVerificationDescription('');
   }
 
   function openVerificationPanel(values) {
@@ -870,8 +898,46 @@ ${issueSummary}
       window.setTimeout(() => verificationCodeInput.focus(), 0);
     }
 
+    renderVerificationDescription(values.tenantId);
     setVerificationStatus('Sending verification code...');
     syncVerificationDownloadButton();
+    syncVerificationResendButton();
+  }
+
+  async function sendVerificationCode(values, options = {}) {
+    const preserveCode = options.preserveCode === true;
+    verificationState.isSending = true;
+    verificationState.isVerified = false;
+    syncVerificationDownloadButton();
+    syncVerificationResendButton();
+
+    if (verificationCodeInput && !preserveCode) {
+      verificationCodeInput.value = '';
+      verificationCodeInput.classList.remove('input-error');
+    }
+
+    setVerificationStatus(options.isResend ? 'Sending a new verification code...' : 'Sending verification code...');
+
+    try {
+      const payload = await requestDownloadCode(values);
+      verificationState.requestId = payload.requestId || '';
+      verificationState.email = values.tenantId;
+      verificationState.hostOrigin = values.hostOrigin;
+      verificationState.tenantId = values.tenantId;
+      setVerificationStatus(`Verification code sent to ${values.tenantId}. Enter the 4-digit code to enable download.`);
+    } catch (error) {
+      console.error(error);
+      setVerificationStatus(error.message || 'Failed to send verification code.', 'error');
+      if (verificationCodeInput) {
+        verificationCodeInput.classList.add('input-error');
+        verificationCodeInput.focus();
+      }
+      throw error;
+    } finally {
+      verificationState.isSending = false;
+      syncVerificationResendButton();
+      syncVerificationDownloadButton();
+    }
   }
 
   async function performVerifiedDownload(values) {
@@ -942,23 +1008,14 @@ ${issueSummary}
     try {
       const effectiveValues = getFormData({ applyDefaults: true });
       openVerificationPanel(effectiveValues);
-      verificationState.isSending = true;
-      const payload = await requestDownloadCode(effectiveValues);
-      verificationState.requestId = payload.requestId || '';
-      setVerificationStatus('Verification code sent. Enter the 4-digit code to enable download.');
+      await sendVerificationCode(effectiveValues);
       downloadButton.textContent = originalText;
     } catch (error) {
-      console.error(error);
       if (verificationState.isOpen) {
-        setVerificationStatus(error.message || 'Failed to send verification code.', 'error');
-        if (verificationCodeInput) {
-          verificationCodeInput.classList.add('input-error');
-          verificationCodeInput.focus();
-        }
+        renderVerificationDescription(values.tenantId);
       }
       downloadButton.textContent = 'Failed';
     } finally {
-      verificationState.isSending = false;
       window.setTimeout(() => {
         downloadButton.disabled = false;
         if (downloadButton.textContent === 'Failed') {
@@ -1040,6 +1097,19 @@ ${issueSummary}
         hostOrigin: verificationState.hostOrigin,
         downloadRequestId: verificationState.requestId
       });
+    });
+  }
+
+  if (verificationResendButton) {
+    verificationResendButton.addEventListener('click', async () => {
+      const values = {
+        ...getFormData({ applyDefaults: true }),
+        tenantId: verificationState.tenantId || getFormData({ applyDefaults: true }).tenantId,
+        hostOrigin: verificationState.hostOrigin || getFormData({ applyDefaults: true }).hostOrigin
+      };
+
+      renderVerificationDescription(values.tenantId);
+      await sendVerificationCode(values, { isResend: true });
     });
   }
 
