@@ -16,6 +16,22 @@
 
   const form = document.getElementById('generator-form');
   const downloadButton = document.getElementById('download-demo-button');
+  const verificationModal = document.getElementById('download-verification-modal');
+  const verificationCodeInput = document.getElementById('verification-code-input');
+  const verificationStatus = document.getElementById('verification-status');
+  const verificationDownloadButton = document.getElementById('verification-download-button');
+  const verificationCloseTargets = Array.from(document.querySelectorAll('[data-close-verification-panel]'));
+
+  const verificationState = {
+    isOpen: false,
+    isVerified: false,
+    requestId: '',
+    email: '',
+    hostOrigin: '',
+    tenantId: '',
+    isSending: false,
+    isDownloading: false
+  };
 
   const fieldErrorElements = new Map(
     Array.from(document.querySelectorAll('[data-field-error]')).map((element) => [
@@ -96,7 +112,8 @@
       },
       body: JSON.stringify({
         tenantId: values.tenantId,
-        hostOrigin: values.hostOrigin
+        hostOrigin: values.hostOrigin,
+        downloadRequestId: values.downloadRequestId || ''
       })
     });
 
@@ -105,6 +122,45 @@
     }
 
     return response.json();
+  }
+
+  async function requestDownloadCode(values) {
+    const response = await fetch(SYSTEM_DEFAULTS.apiBase + '/api/ac2/request-download-code', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        tenantId: values.tenantId,
+        hostOrigin: values.hostOrigin
+      })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload || !payload.ok) {
+      throw new Error(payload && payload.message ? payload.message : 'Failed to send verification code.');
+    }
+
+    return payload;
+  }
+
+  async function verifyDownloadCode(payload) {
+    const response = await fetch(SYSTEM_DEFAULTS.apiBase + '/api/ac2/verify-download-code', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data || !data.ok) {
+      throw new Error(data && data.message ? data.message : 'Verification failed.');
+    }
+
+    return data;
   }
 
   function triggerBlobDownload(blob, filename) {
@@ -756,6 +812,116 @@ ${issueSummary}
     renderFieldErrors({});
   }
 
+  function setVerificationStatus(message, tone = '') {
+    if (!verificationStatus) {
+      return;
+    }
+
+    verificationStatus.textContent = message || '';
+    verificationStatus.classList.toggle('is-error', tone === 'error');
+    verificationStatus.classList.toggle('is-success', tone === 'success');
+  }
+
+  function syncVerificationDownloadButton() {
+    if (!verificationDownloadButton) {
+      return;
+    }
+
+    verificationDownloadButton.disabled = !verificationState.isVerified || verificationState.isDownloading;
+  }
+
+  function closeVerificationPanel() {
+    verificationState.isOpen = false;
+    verificationState.isVerified = false;
+    verificationState.requestId = '';
+    verificationState.email = '';
+    verificationState.hostOrigin = '';
+    verificationState.tenantId = '';
+    verificationState.isSending = false;
+    verificationState.isDownloading = false;
+
+    if (verificationModal) {
+      verificationModal.hidden = true;
+    }
+
+    if (verificationCodeInput) {
+      verificationCodeInput.value = '';
+      verificationCodeInput.classList.remove('input-error');
+    }
+
+    setVerificationStatus('');
+    syncVerificationDownloadButton();
+  }
+
+  function openVerificationPanel(values) {
+    verificationState.isOpen = true;
+    verificationState.isVerified = false;
+    verificationState.email = values.tenantId;
+    verificationState.hostOrigin = values.hostOrigin;
+    verificationState.tenantId = values.tenantId;
+
+    if (verificationModal) {
+      verificationModal.hidden = false;
+    }
+
+    if (verificationCodeInput) {
+      verificationCodeInput.value = '';
+      verificationCodeInput.classList.remove('input-error');
+      window.setTimeout(() => verificationCodeInput.focus(), 0);
+    }
+
+    setVerificationStatus('Sending verification code...');
+    syncVerificationDownloadButton();
+  }
+
+  async function performVerifiedDownload(values) {
+    if (!downloadButton || verificationState.isDownloading) {
+      return;
+    }
+
+    const originalMainButtonText = downloadButton.textContent;
+    const originalPanelButtonText = verificationDownloadButton ? verificationDownloadButton.textContent : 'Download';
+
+    verificationState.isDownloading = true;
+    downloadButton.disabled = true;
+    downloadButton.textContent = 'Preparing';
+    if (verificationDownloadButton) {
+      verificationDownloadButton.disabled = true;
+      verificationDownloadButton.textContent = 'Preparing';
+    }
+
+    try {
+      await registerHostOrigin(values);
+      const archive = await buildTenantDemoArchive(values);
+      const saveResult = await saveArchiveBlob(archive.blob, archive.archiveName + '.zip');
+
+      if (saveResult !== 'cancelled') {
+        closeVerificationPanel();
+        downloadButton.textContent = 'Downloaded';
+      } else {
+        setVerificationStatus('Download was cancelled. You can try again.', 'error');
+        downloadButton.textContent = originalMainButtonText;
+      }
+    } catch (error) {
+      console.error(error);
+      setVerificationStatus(error.message || 'Download failed.', 'error');
+      if (verificationCodeInput) {
+        verificationCodeInput.classList.add('input-error');
+      }
+      downloadButton.textContent = 'Failed';
+    } finally {
+      verificationState.isDownloading = false;
+      if (verificationDownloadButton) {
+        verificationDownloadButton.textContent = originalPanelButtonText;
+      }
+      syncVerificationDownloadButton();
+      window.setTimeout(() => {
+        downloadButton.disabled = false;
+        downloadButton.textContent = originalMainButtonText;
+      }, 1400);
+    }
+  }
+
   async function handleDownloadDemo() {
     const values = getFormData();
     const validation = validate(values);
@@ -771,32 +937,116 @@ ${issueSummary}
 
     const originalText = downloadButton.textContent;
     downloadButton.disabled = true;
-    downloadButton.textContent = 'Preparing';
+    downloadButton.textContent = 'Sending';
 
     try {
       const effectiveValues = getFormData({ applyDefaults: true });
-      await registerHostOrigin(effectiveValues);
-      const archive = await buildTenantDemoArchive(effectiveValues);
-      const saveResult = await saveArchiveBlob(archive.blob, archive.archiveName + '.zip');
-      downloadButton.textContent = saveResult === 'cancelled' ? originalText : 'Downloaded';
+      openVerificationPanel(effectiveValues);
+      verificationState.isSending = true;
+      const payload = await requestDownloadCode(effectiveValues);
+      verificationState.requestId = payload.requestId || '';
+      setVerificationStatus('Verification code sent. Enter the 4-digit code to enable download.');
+      downloadButton.textContent = originalText;
     } catch (error) {
       console.error(error);
+      if (verificationState.isOpen) {
+        setVerificationStatus(error.message || 'Failed to send verification code.', 'error');
+        if (verificationCodeInput) {
+          verificationCodeInput.classList.add('input-error');
+          verificationCodeInput.focus();
+        }
+      }
       downloadButton.textContent = 'Failed';
     } finally {
+      verificationState.isSending = false;
       window.setTimeout(() => {
         downloadButton.disabled = false;
-        downloadButton.textContent = originalText;
+        if (downloadButton.textContent === 'Failed') {
+          downloadButton.textContent = originalText;
+        }
       }, 1400);
     }
   }
 
-  form.addEventListener('input', clearFieldErrors);
-  form.addEventListener('change', clearFieldErrors);
+  async function handleVerificationCodeInput() {
+    if (!verificationCodeInput || !verificationState.requestId) {
+      return;
+    }
+
+    const code = verificationCodeInput.value.replace(/\D+/g, '').slice(0, 4);
+    verificationCodeInput.value = code;
+    verificationState.isVerified = false;
+    verificationCodeInput.classList.remove('input-error');
+    syncVerificationDownloadButton();
+
+    if (code.length < 4) {
+      setVerificationStatus('Enter the 4-digit verification code.');
+      return;
+    }
+
+    setVerificationStatus('Verifying code...');
+
+    try {
+      await verifyDownloadCode({
+        requestId: verificationState.requestId,
+        tenantId: verificationState.tenantId,
+        hostOrigin: verificationState.hostOrigin,
+        code
+      });
+      verificationState.isVerified = true;
+      setVerificationStatus('Code verified. Download is now enabled.', 'success');
+      syncVerificationDownloadButton();
+    } catch (error) {
+      verificationState.isVerified = false;
+      verificationCodeInput.classList.add('input-error');
+      setVerificationStatus(error.message || 'Verification code is incorrect.', 'error');
+      syncVerificationDownloadButton();
+    }
+  }
+
+  form.addEventListener('input', () => {
+    clearFieldErrors();
+  });
+  form.addEventListener('change', () => {
+    clearFieldErrors();
+  });
 
   if (downloadButton) {
     downloadButton.addEventListener('click', () => {
       handleDownloadDemo();
     });
   }
+
+  if (verificationCodeInput) {
+    verificationCodeInput.addEventListener('input', () => {
+      handleVerificationCodeInput();
+    });
+  }
+
+  if (verificationDownloadButton) {
+    verificationDownloadButton.addEventListener('click', () => {
+      if (!verificationState.isVerified) {
+        setVerificationStatus('Enter the correct verification code before downloading.', 'error');
+        if (verificationCodeInput) {
+          verificationCodeInput.classList.add('input-error');
+          verificationCodeInput.focus();
+        }
+        return;
+      }
+
+      performVerifiedDownload({
+        ...getFormData({ applyDefaults: true }),
+        tenantId: verificationState.tenantId,
+        hostOrigin: verificationState.hostOrigin,
+        downloadRequestId: verificationState.requestId
+      });
+    });
+  }
+
+  verificationCloseTargets.forEach((target) => {
+    target.addEventListener('click', () => {
+      closeVerificationPanel();
+    });
+  });
 
 })();
