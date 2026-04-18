@@ -322,17 +322,15 @@
     ]);
 
     const customizedMinimalHtml = replaceLiteral(
-      replaceLiteral(
-        replaceLiteral(
-          minimalHtml,
-          '<title>AC2 Minimal Host</title>',
-          `<title>${escapeForHtmlText(values.tenantId)} AC2 Minimal Host</title>`
-        ),
-        '<h1>AC2 Minimal Host</h1>',
-        `<h1>${escapeForHtmlText(values.tenantId)} AC2 Minimal Host</h1>`
-      ),
-      "tenantId: 'viverse',",
-      `tenantId: '${escapeForSingleQuotedJs(values.tenantId)}',`
+      minimalHtml,
+      "const tenantId = 'viverse';",
+      `const tenantId = '${escapeForSingleQuotedJs(values.tenantId)}';`
+    );
+
+    const customizedMinimalHtmlWithHostOrigin = replaceLiteral(
+      customizedMinimalHtml,
+      'const hostOrigin = window.location.origin;',
+      `const hostOrigin = '${escapeForSingleQuotedJs(values.hostOrigin)}';`
     );
 
     const customizedMinimalAc2Host = replaceLiteral(
@@ -370,7 +368,7 @@
       },
       {
         path: 'minimal/index.html',
-        content: customizedMinimalHtml
+        content: customizedMinimalHtmlWithHostOrigin
       },
       {
         path: 'minimal/ac2-host.js',
