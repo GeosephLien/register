@@ -66,6 +66,14 @@
       .replace(/>/g, '&gt;');
   }
 
+  function replaceLiteral(source, searchValue, replaceValue) {
+    if (!source.includes(searchValue)) {
+      throw new Error('Expected template fragment not found: ' + searchValue);
+    }
+
+    return source.replace(searchValue, replaceValue);
+  }
+
   async function fetchAsset(path, responseType = 'text') {
     const response = await fetch(path, { cache: 'no-store' });
     if (!response.ok) {
@@ -290,30 +298,103 @@
   }
 
   async function buildTenantDemoArchive(values) {
-    const tenantFolderName = getArchiveBaseName(values.tenantId, 'ac2-demo');
+    const tenantFolderName = 'ac2-' + getArchiveBaseName(values.tenantId, 'demo');
     const frameSource = getFrameSource(values.hostOrigin);
 
-    const demoHtml = await fetchAsset('../demo/index.html', 'text');
+    const [
+      readme,
+      minimalHtml,
+      minimalAc2Host,
+      demoSceneHtml,
+      demoSceneCss,
+      demoSceneAc2Host,
+      demoSceneMain,
+      demoSceneVrmScene
+    ] = await Promise.all([
+      fetchAsset('../demo/README.md', 'text'),
+      fetchAsset('../demo/minimal/index.html', 'text'),
+      fetchAsset('../demo/minimal/ac2-host.js', 'text'),
+      fetchAsset('../demo/demo-scene/index.html', 'text'),
+      fetchAsset('../demo/demo-scene/style.css', 'text'),
+      fetchAsset('../demo/demo-scene/ac2-host.js', 'text'),
+      fetchAsset('../demo/demo-scene/main.js', 'text'),
+      fetchAsset('../demo/demo-scene/vrm-scene.js', 'text')
+    ]);
 
-    let customizedHtml = demoHtml;
-    customizedHtml = customizedHtml.replace('<title>Partner VRM Host</title>', `<title>${escapeForHtmlText(values.tenantId)} VRM Host</title>`);
-    customizedHtml = customizedHtml.replace('const AC2_API_BASE = \'https://ac2-host-api-avatar-page.kuanyi-lien.workers.dev\';', `const AC2_API_BASE = 'https://ac2-host-api-avatar-page.kuanyi-lien.workers.dev';`);
-    customizedHtml = customizedHtml.replace(
-      'const HOST_ORIGIN = window.location.origin;',
-      `const HOST_ORIGIN = window.location.origin;\n    const REGISTERED_HOST_ORIGIN = '${escapeForSingleQuotedJs(values.hostOrigin)}';`
+    const customizedMinimalHtml = replaceLiteral(
+      replaceLiteral(
+        replaceLiteral(
+          minimalHtml,
+          '<title>AC2 Minimal Host</title>',
+          `<title>${escapeForHtmlText(values.tenantId)} AC2 Minimal Host</title>`
+        ),
+        '<h1>AC2 Minimal Host</h1>',
+        `<h1>${escapeForHtmlText(values.tenantId)} AC2 Minimal Host</h1>`
+      ),
+      "tenantId: 'viverse',",
+      `tenantId: '${escapeForSingleQuotedJs(values.tenantId)}',`
     );
-    customizedHtml = customizedHtml.replace('const AC2_TENANT_ID = \'viverse\';', `const AC2_TENANT_ID = '${escapeForSingleQuotedJs(values.tenantId)}';`);
-    customizedHtml = customizedHtml.replace("source: 'partner-host',", `source: '${escapeForSingleQuotedJs(frameSource)}',`);
-    customizedHtml = customizedHtml.replace('<h1 class="overlay-title">Partner VRM Host</h1>', `<h1 class="overlay-title">${escapeForHtmlText(values.tenantId)} VRM Host</h1>`);
-    customizedHtml = customizedHtml.replace(
-      'This page owns the AC2 session, opens AC2 on demand, and swaps the host scene avatar when AC2 selects a different VRM.',
-      `This page owns the AC2 session, opens AC2 on demand, and swaps the host scene avatar when AC2 selects a different VRM. Current host origin: window.location.origin. Registered host origin: ${escapeForHtmlText(values.hostOrigin)}.`
+
+    const customizedMinimalAc2Host = replaceLiteral(
+      minimalAc2Host,
+      "source: 'partner-host',",
+      `source: '${escapeForSingleQuotedJs(frameSource)}',`
+    );
+
+    const customizedDemoSceneHtml = replaceLiteral(
+      replaceLiteral(
+        demoSceneHtml,
+        '<title>Partner VRM Host</title>',
+        `<title>${escapeForHtmlText(values.tenantId)} VRM Host</title>`
+      ),
+      '<h1 class="overlay-title">Partner VRM Host</h1>',
+      `<h1 class="overlay-title">${escapeForHtmlText(values.tenantId)} VRM Host</h1>`
+    );
+
+    const customizedDemoSceneAc2Host = replaceLiteral(
+      demoSceneAc2Host,
+      "source: 'partner-host',",
+      `source: '${escapeForSingleQuotedJs(frameSource)}',`
+    );
+
+    const customizedDemoSceneMain = replaceLiteral(
+      demoSceneMain,
+      "tenantId: 'viverse',",
+      `tenantId: '${escapeForSingleQuotedJs(values.tenantId)}',`
     );
 
     const blob = await buildZipBlob([
       {
-        path: 'index.html',
-        content: customizedHtml
+        path: 'README.md',
+        content: readme
+      },
+      {
+        path: 'minimal/index.html',
+        content: customizedMinimalHtml
+      },
+      {
+        path: 'minimal/ac2-host.js',
+        content: customizedMinimalAc2Host
+      },
+      {
+        path: 'demo-scene/index.html',
+        content: customizedDemoSceneHtml
+      },
+      {
+        path: 'demo-scene/style.css',
+        content: demoSceneCss
+      },
+      {
+        path: 'demo-scene/ac2-host.js',
+        content: customizedDemoSceneAc2Host
+      },
+      {
+        path: 'demo-scene/main.js',
+        content: customizedDemoSceneMain
+      },
+      {
+        path: 'demo-scene/vrm-scene.js',
+        content: demoSceneVrmScene
       }
     ]);
 
