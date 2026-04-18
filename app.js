@@ -206,6 +206,10 @@
   }
 
   async function saveArchiveBlob(blob, filename) {
+    if (typeof window.showSaveFilePicker !== 'function') {
+      throw new Error('This browser does not support the file picker required for download.');
+    }
+
     try {
       const saved = await saveBlobWithFilePicker(blob, filename);
       if (saved) {
@@ -215,11 +219,10 @@
       if (isFilePickerAbortError(error)) {
         return 'cancelled';
       }
-      console.warn('File picker save failed, falling back to browser download.', error);
+      throw new Error('Unable to open the file picker for download.');
     }
 
-    triggerBlobDownload(blob, filename);
-    return 'downloaded';
+    throw new Error('Unable to open the file picker for download.');
   }
 
   const CRC32_TABLE = (() => {
